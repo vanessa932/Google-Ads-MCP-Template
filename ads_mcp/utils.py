@@ -154,14 +154,62 @@ def resolve_login_customer_id(
     That keeps manager-mediated setups working while letting a single
     deployment also address standalone accounts the user owns outright.
     """
-    configured = os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID")
+    managers = _configured_managers()
     if not customer_id:
-        return clean_customer_id(configured) if configured else None
+        return managers[0] if managers else None
 
     target = clean_customer_id(customer_id)
     if target in _directly_accessible_customers(credentials):
         return None
-    return clean_customer_id(configured) if configured else None
+    if len(managers) <= 1:
+        return managers[0] if managers else None
+
+    # Several managers configured: use the one whose tree holds the target.
+    for manager in managers:
+        if target == manager or target in _manager_tree(manager, credentials):
+            return manager
+    return managers[0]
+
+
+def _configured_managers() -> List[str]:
+    """GOOGLE_ADS_LOGIN_CUSTOMER_ID as a list; accepts several manager ids
+    separated by commas (e.g. one per agency squad)."""
+    raw = os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID") or ""
+    return [clean_customer_id(m) for m in raw.split(",") if m.strip()]
+
+
+# Cache of every account under each manager, keyed by (identity, manager).
+_tree_cache: dict = {}
+
+
+def _manager_tree(manager_id: str, credentials) -> frozenset:
+    """All client account ids anywhere below a manager account (cached)."""
+    key = (_credential_key(credentials), manager_id)
+    with _accessible_lock:
+        if key in _tree_cache:
+            return _tree_cache[key]
+    try:
+        client = GoogleAdsClient(
+            credentials=credentials,
+            developer_token=_get_developer_token(),
+            login_customer_id=manager_id,
+            use_proto_plus=True,
+        )
+        rows = client.get_service("GoogleAdsService").search(
+            customer_id=manager_id,
+            query="SELECT customer_client.id FROM customer_client",
+        )
+        result = frozenset(str(row.customer_client.id) for row in rows)
+    except Exception as ex:  # non-fatal: this manager just won't match
+        logger.warning(
+            "ads_mcp: could not list accounts under manager %s: %s",
+            manager_id,
+            ex,
+        )
+        result = frozenset()
+    with _accessible_lock:
+        _tree_cache[key] = result
+    return result
 
 
 def get_googleads_client(

@@ -80,3 +80,24 @@ def test_client_uses_resolved_id(monkeypatch):
     utils.set_target_customer_id("2345678901")
     utils.get_googleads_client(login_customer_id="222-222-2222")
     assert captured.get("login_customer_id") == "2222222222", "explicit wins"
+
+
+def test_several_managers_pick_the_one_holding_the_account(monkeypatch):
+    """A comma-separated list routes each account through its own manager."""
+    monkeypatch.setenv(
+        "GOOGLE_ADS_LOGIN_CUSTOMER_ID", "111-111-1111, 222-222-2222"
+    )
+    trees = {
+        "1111111111": frozenset({"1111111111", "5555555555"}),
+        "2222222222": frozenset({"2222222222", "6666666666"}),
+    }
+    monkeypatch.setattr(utils, "_manager_tree", lambda m, creds: trees[m])
+    resolve = utils.resolve_login_customer_id
+    assert resolve("5555555555", FakeCreds()) == "1111111111"
+    assert resolve("666-666-6666", FakeCreds()) == "2222222222"
+    assert resolve("2222222222", FakeCreds()) == "2222222222"
+    # directly accessible accounts still send no header
+    assert resolve("2345678901", FakeCreds()) is None
+    # unknown account and no target fall back to the first manager
+    assert resolve("9999999999", FakeCreds()) == "1111111111"
+    assert resolve(None, FakeCreds()) == "1111111111"
