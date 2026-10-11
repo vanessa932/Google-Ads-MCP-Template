@@ -6,7 +6,7 @@ license = "Apache-2.0"
 dependencies = [
     "google-ads>=31.0.0",
     "mcp[cli]>=1.2.0",
-    "fastmcp>=3.2.0",
+    "fastmcp>=3.2.0,<5",
 ]
 
 description = "Remote MCP server for monitoring and managing Google Ads accounts with Claude and other AI assistants."

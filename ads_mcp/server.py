@@ -54,8 +54,25 @@ def run_server() -> None:
     )
     port = int(os.environ.get("PORT", "8080"))
 
-    if oauth_configured or force_http:
+    if oauth_configured:
         mcp.run(transport="streamable-http", port=port, host="0.0.0.0")
+    elif force_http:
+        # Without OAuth the endpoint has no login, so it is only served
+        # under a long secret path (the URL itself is the password).
+        # Suited to free hosts whose disk is wiped on restart, where the
+        # OAuth mode would lose its sessions every time the server sleeps.
+        secret = os.environ.get("GOOGLE_ADS_MCP_SECRET_PATH", "").strip("/ ")
+        if len(secret) < 24:
+            raise SystemExit(
+                "GOOGLE_ADS_MCP_SECRET_PATH must be set to a random string of "
+                "at least 24 characters when running over HTTP without OAuth."
+            )
+        mcp.run(
+            transport="streamable-http",
+            port=port,
+            host="0.0.0.0",
+            path=f"/{secret}/mcp",
+        )
     else:
         mcp.run()
 

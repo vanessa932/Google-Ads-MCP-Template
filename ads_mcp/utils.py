@@ -83,15 +83,11 @@ def _create_credentials() -> google.auth.credentials.Credentials:
     return credentials
 
 
-def _get_developer_token() -> str:
-    dev_token = os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN")
-    if dev_token is None:
-        raise ToolError(
-            "GOOGLE_ADS_DEVELOPER_TOKEN environment variable not set. "
-            "Request one under Tools & Settings > API Center in a Google "
-            "Ads manager account."
-        )
-    return dev_token
+def _get_developer_token() -> Optional[str]:
+    # Since September 2026 Google Ads API access is tied to the Google Cloud
+    # project and the developer token is optional (ignored by the API), so
+    # it is only sent when one is configured.
+    return os.environ.get("GOOGLE_ADS_DEVELOPER_TOKEN") or None
 
 
 def set_target_customer_id(customer_id: Optional[str]) -> None:
