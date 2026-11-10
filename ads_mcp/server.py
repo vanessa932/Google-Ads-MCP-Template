@@ -41,6 +41,7 @@ if not _is_read_only():
         campaigns,
         conversions,
         keywords,
+        pmax,
         targeting,
     )
 

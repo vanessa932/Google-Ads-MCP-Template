@@ -38,6 +38,7 @@ EXPECTED_TOOLS = {
     "add_keywords",
     "set_keyword_status",
     "add_negative_keywords",
+    "create_performance_max_campaign",
 }
 
 
